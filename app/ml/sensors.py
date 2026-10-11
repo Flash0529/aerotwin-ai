@@ -78,16 +78,17 @@ class GenericSpec(NamedTuple):
     limit: float       # value at which health is 0 (the component is at its limit)
     unit: str
     extras: tuple[str, ...]  # other keys the telemetry source should send
+    life_cycles: float = 1000.0   # typical flights from new/serviced to the limit (sets the normal wear rate)
 
 
 # SYNTHETIC DEMO VALUES. Not real limits, not from any manual. The rule is
 # "health falls linearly from `healthy` to `limit`"; the label is
 # "rule-based demo model" everywhere it is shown.
 GENERIC: dict[str, GenericSpec] = {
-    "brakes": GenericSpec("brakes", "pad_wear_mm", "up", 0.0, 12.0, "mm", ("disc_temp_c",)),
-    "landing_gear": GenericSpec("landing_gear", "strut_pressure_kpa", "down", 1800.0, 1200.0, "kPa", ("shock_load_g",)),
-    "hydraulics": GenericSpec("hydraulics", "pump_pressure_kpa", "down", 20700.0, 17200.0, "kPa", ("fluid_temp_c",)),
-    "avionics": GenericSpec("avionics", "error_rate_per_khr", "up", 0.2, 5.0, "1/kh", ("box_temp_c",)),
+    "brakes": GenericSpec("brakes", "pad_wear_mm", "up", 0.0, 12.0, "mm", ("disc_temp_c",), 700.0),
+    "landing_gear": GenericSpec("landing_gear", "strut_pressure_kpa", "down", 1800.0, 1200.0, "kPa", ("shock_load_g",), 1200.0),
+    "hydraulics": GenericSpec("hydraulics", "pump_pressure_kpa", "down", 20700.0, 17200.0, "kPa", ("fluid_temp_c",), 2000.0),
+    "avionics": GenericSpec("avionics", "error_rate_per_khr", "up", 0.2, 5.0, "1/kh", ("box_temp_c",), 3000.0),
 }
 
 # Keys of TelemetryRow.values per component kind (engine uses SENSOR_NAMES).
@@ -101,3 +102,23 @@ def kind_from_component_id(component_id: str) -> str:
     """'SIM-017/engine_2' -> 'engine'; 'SIM-017/brakes' -> 'brakes'."""
     name = component_id.split("/")[-1]
     return "engine" if name.startswith("engine") else name
+
+
+# Where each engine sensor is measured in a CFM56-type two-spool turbofan:
+# (module, station, short description). Used to place readings on the engine section.
+ENGINE_STATIONS: dict[str, tuple[str, str, str]] = {
+    "Nf": ("fan", "N1", "Fan / low-pressure spool speed"),
+    "NRf": ("fan", "N1", "Corrected fan speed"),
+    "BPR": ("bypass", "duct", "Bypass ratio"),
+    "T24": ("lpc", "24", "Booster (LPC) exit temperature"),
+    "Nc": ("hpc", "N2", "Core / high-pressure spool speed"),
+    "NRc": ("hpc", "N2", "Corrected core speed"),
+    "htBleed": ("hpc", "bleed", "HPC bleed enthalpy"),
+    "T30": ("hpc", "3", "HPC exit temperature"),
+    "P30": ("hpc", "3", "HPC exit total pressure"),
+    "Ps30": ("hpc", "3", "HPC exit static pressure"),
+    "phi": ("combustor", "4", "Fuel flow to Ps30 ratio"),
+    "W31": ("hpt", "cooling", "HPT coolant bleed"),
+    "W32": ("lpt", "cooling", "LPT coolant bleed"),
+    "T50": ("lpt", "5", "LPT exit temperature"),
+}

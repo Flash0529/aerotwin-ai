@@ -4,6 +4,7 @@ import type {
   Comparison,
   HealthInfo,
   InjectResult,
+  Plan,
   PlanMetrics,
   ReplanResult,
   ScenarioEvent,
@@ -27,15 +28,14 @@ type Result =
 export default function Lab() {
   const health = usePoll<HealthInfo>("/health", 5000);
   const stations = usePoll<Station[]>("/stations", 5000);
+  const plan = usePoll<{ current: Plan }>("/plan", 5000);
   const now = health.data?.sim_now ?? "2026-10-12T12:00:00Z";
-  const engineTech = stations.data
-    ?.find((s) => s.iata === "DFW")
-    ?.technicians.find(
-      (t) =>
-        t.available &&
-        t.skills.includes("engine") &&
-        Date.parse(t.shift_end) > Date.parse(now),
-    );
+  // The engine technician who is actually on the SIM-017 job (so the scenario has an effect), else the first one on shift.
+  const dfwTechs = stations.data?.find((s) => s.iata === "DFW")?.technicians ?? [];
+  const assigned = plan.data?.current.assignments.find((a) => a.station === "DFW" && a.tail === "SIM-017")?.technician_id;
+  const engineTech =
+    dfwTechs.find((t) => t.id === assigned && t.available) ??
+    dfwTechs.find((t) => t.available && t.skills.includes("engine") && Date.parse(t.shift_end) > Date.parse(now));
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
   const [result, setResult] = useState<Result>(null);
@@ -195,11 +195,10 @@ export default function Lab() {
 
   return (
     <div className="space-y-4">
-      <div className="page-heading">
+      <div className="page-head">
         <div>
-          <div className="eyebrow">Scenarios</div>
-          <h1>Try a disruption</h1>
-          <p>Inject a fault, delay a part or close a hangar, then compare the plan before and after. Everything here is simulated.</p>
+          <h1>Scenarios</h1>
+          <p>Inject a fault or take a resource away, then compare the plan before and after. Every change here is simulated.</p>
         </div>
       </div>
       <ErrorBox error={err} />
@@ -209,21 +208,24 @@ export default function Lab() {
           <span className="text-xs text-slate-500">sim time {fmtZ(now)}</span>
         }
       >
-        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+        <ul className="divide-y divide-[rgba(0,0,0,0.08)]">
           {actions.map((a) => (
-            <div key={a.id} className="rounded-lg border border-slate-200 p-3">
+            <li key={a.id} className="flex items-center justify-between gap-4 py-3">
+              <div className="min-w-0">
+                <div className="text-[14px] font-medium text-slate-900">{a.label}</div>
+                <p className="mt-0.5 text-[12.5px] text-slate-500">{a.hint}</p>
+              </div>
               <Btn
-                tone={a.id === "reset" ? "default" : "primary"}
+                tone={a.id === "reset" ? "danger" : "default"}
                 disabled={!!busy}
                 onClick={() => run(a.id, a.go)}
-                className="w-full"
+                className="shrink-0"
               >
-                {busy === a.id ? "Working…" : a.label}
+                {busy === a.id ? "Working…" : a.id === "reset" ? "Reset" : a.id === "step" ? "Advance" : "Run"}
               </Btn>
-              <p className="mt-1.5 text-xs text-slate-500">{a.hint}</p>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </Card>
 
       {result && (
@@ -262,7 +264,7 @@ export default function Lab() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-500">
+              <thead className="text-xs text-slate-500">
                 <tr>
                   <th className="py-1.5">Scenario</th>
                   <th>Feasible</th>
@@ -333,7 +335,7 @@ function ReplanView({ r }: { r: ReplanResult }) {
         </span>
       </div>
       <table className="w-full max-w-lg text-left">
-        <thead className="text-xs uppercase text-slate-500">
+        <thead className="text-xs text-slate-500">
           <tr>
             <th className="py-1">Metric</th>
             <th className="text-right">Before</th>
@@ -353,7 +355,7 @@ function ReplanView({ r }: { r: ReplanResult }) {
         </tbody>
       </table>
       <div>
-        <div className="mb-1 text-xs font-semibold uppercase text-slate-500">
+        <div className="mb-1 text-xs font-semibold text-slate-500">
           What changed
         </div>
         {r.diff.moved.length + r.diff.added.length + r.diff.dropped.length ===
