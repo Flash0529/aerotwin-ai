@@ -7,7 +7,7 @@ Scope of this branch: **only my package** (3.3 scheduler, 3.5 what-if, task card
 
 * YES: a part delay holds the kits until the event time plus the delay (units are not deleted).
 * YES: keep the 0.05 per hour "fix sooner" preference (tie-breaker only; deadlines stay hard).
-* Event rules: Pardhu shared the Hacklanta 2026 Hacker Guide (Notion link in `docs/AI-DISCLOSURE-DRAFT.md`); I could not open it from the sandbox, so the AI-disclosure wording is still a draft until its AI-policy section is pasted.
+* Event rules: read by Shamit from the Hacker Guide and recorded in `docs/HACKLANTA-RULES.md` (deadline Sun 9:00 AM ET, no separate AI-disclosure rule). Whether to publish an AI statement is Shamit's call; the draft file was removed from `main`.
 
 ## 000. Update 4: baseline contrast (reply to Shamit's review)
 
@@ -27,7 +27,7 @@ Scope of this branch: **only my package** (3.3 scheduler, 3.5 what-if, task card
 * Merged `origin/main` (the Shamit/Aadhavan job swap, `work/OWNERSHIP.md`): clean merge. I also read Aashirth's `aashirth/ml-core` branch; nothing there conflicts, and I did not merge it.
 * **New owner of the agent tool registry + scripted runner (piece 11) is me** (marked "proposed" in OWNERSHIP.md; Shamit confirms). **Built and tested:** `app/agents/` (16 tools, five-agent scripted workflow, `POST /agents/run`, `GET /agents/runs/{id}`), `scripts/agent_demo.py`, `fixtures/agent_run_golden.json`, 22 tests. A scripted run takes about 0.6 s.
 * Totals now: **299 tests pass** across the whole merged repo (2 fail: Shamit's order-dependent `test_db_mode`, one of them also on plain `main`); `scripts/mutation_check.py` breaks 30 rules one at a time and all 30 are caught.
-* The event rules could not be verified (no AI policy found online; `hacklanta.dev` unreachable from here). Draft disclosure text is in `docs/AI-DISCLOSURE-DRAFT.md`; someone must read the real rules.
+* Event rules are now in `docs/HACKLANTA-RULES.md` (AI tools allowed, nothing separate to disclose; projects that misrepresent how they were built are ineligible).
 * Still impossible without teammates: running on the real snapshot (Aashirth's twin, Aadhavan's fleet), the team decisions (section 4, item 3), the real numbers for slides.
 
 ## 1. Where things stand
@@ -47,7 +47,7 @@ Scope of this branch: **only my package** (3.3 scheduler, 3.5 what-if, task card
 > **Shamit:** (1) keep YOUR `models.py` when merging; mine is a verbatim copy. (2) `requirements.txt` needs `ortools`, `simpy`, `pyyaml` (not in the INTEGRATION.md list) and `httpx` for the tests. (3) mount `app.solver.router.router`, `app.whatif.router.router`, `app.agents.router.router` in `main.py`. (4) Please confirm piece 11 (tool registry + scripted runner) is mine, as OWNERSHIP.md proposes. (5) If your fixtures `plan_*.json` / `agent_run_golden.json` collide with mine in the merge, take mine (they come from the real code). (6) Your screens can use: `GET /plan` -> `{current, baseline, compare}`; `POST /plan/replan {event}` (422 `{"error","detail"}` for a bad event); `POST /whatif/compare {scenarios: []}` (empty = 5 default what-ifs); show `Assignment.reason`, `PlanDiff.moved[].why`, `infeasible_reasons` in a red banner, the SIMULATED badge.
 > **Aadhavan (fleet generator + `/scenario/inject`):** please set `ComponentState.last_maintenance` (else no routine tasks appear); chain legs so each arrival airport equals the next departure airport; keep the golden facts: SIM-017 has a ground window of 6 h or more at DFW that STARTS within a few hours of the sim start (otherwise a 12 h kit delay changes nothing), ATL has 0 BORESCOPE-KIT, DFW has 2. If `/scenario/inject` writes `part_delay`/`facility_closed`/`tech_unavailable` into the DB, call `replan(..., already_applied=True)` (or `replan_and_store`), otherwise the event is applied twice. Call `STORE.reset()` and `RUNS.reset()` on `/scenario/reset`.
 > **Aashirth (ML + twin, and LLM mode/copilot if piece 12 continues):** the scheduler only needs `rul_cycles.p10` (never p50) and `last_maintenance` on each `ComponentState`, and `twin.snapshot()` returning `FleetState` with `now` = the sim clock. For LLM mode, the registry is ready: `from app.agents.tools import TOOLS, call_tool` (name, description, JSON `input_schema`, `fn`); `run_workflow(goal, scope, mode)` already falls back to scripted and records it. `get_sensor_trend` calls `app.twin.state.get_twin(tail)` when it exists. Persist runs with `RUNS.add_listener(fn)`; work orders are drafted `pending_approval` by `app/agents/workorders.py` (your copilot's `decide()` approves them).
-> **All:** two choices I made that you may want to change (section 4 of `app/solver/README.md`): kit delay = units held until event time + delay (not deleted), and a small "finish sooner" preference of 0.05 per hour in the objective (deadlines stay hard). Also: someone please read the real event rules; my draft AI disclosure is in `docs/AI-DISCLOSURE-DRAFT.md`.
+> **All:** two choices I made that you may want to change (section 4 of `app/solver/README.md`): kit delay = units held until event time + delay (not deleted), and a small "finish sooner" preference of 0.05 per hour in the objective (deadlines stay hard).
 
 ## 3. What I present (about 3 minutes, every number from `python scripts/plan_demo.py`)
 
@@ -80,7 +80,7 @@ Likely questions: *Why not let the LLM schedule?* Numbers and safety rules must 
 2. **C1 check on the real data:** run `python scripts/plan_demo.py` against the real `twin.snapshot()` (it uses it automatically once `app/twin/state.py` exists) and re-run `--export` to refresh the fixtures. Check the golden facts hold in Shamit's fleet; if not, tell him or adjust the golden scenario.
 3. **Confirm the three choices** with the team: kit-delay semantics, the 0.05/h earliness term, the 3 h extension cap.
 4. **Replace the numbers** in section 3 with the real run before they appear on a slide or in the video.
-5. **Disclose AI assistance** in the README/Devpost if the event requires it (this module was built with Claude): draft in `docs/AI-DISCLOSURE-DRAFT.md`; the real rules still need to be read by someone.
+5. **AI assistance:** per `docs/HACKLANTA-RULES.md` AI tools are allowed and no separate disclosure is required. Answer honestly if a judge asks how this module was built (it was written with Claude and checked by 299 tests and 30 mutation checks).
 6. **Stretch goals are built** (`app/solver/skills.py`, `reposition.py`; multi-fault tests in `tests/test_whatif.py`); nothing more to build on my side.
 7. **Tick** the remaining boxes in `work/03-...` and `TASK-BOARD.md` after C1.
 
